@@ -2,11 +2,20 @@ from flask import Flask, request
 
 app = Flask(__name__)
 
-@app.route('/iclock/cdata', methods=['GET', 'POST'])
+@app.route('/iclock/cdata', methods=['POST'])
 def receive_data():
-    print("REQUETE K50 RECUE")
-    print(request.data)
+    print("📥 DATA FROM K50")
+    print(request.data.decode(errors="ignore"))
     return "OK"
+
+@app.route('/iclock/getrequest', methods=['GET'])
+def get_request():
+    sn = request.args.get("SN")
+    print(f"📤 COMMAND REQUEST from {sn}")
+
+    # Ask device to send ALL fingerprint templates
+    command = "DATA QUERY FINGERTMP\n"
+    return command
 
 @app.route('/')
 def home():
