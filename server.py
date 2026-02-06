@@ -2,34 +2,37 @@ from flask import Flask, request
 
 app = Flask(__name__)
 
-# Dictionnaire ID → Nom (ici juste Djamel)
-users = {
-    "1": "Djamel"
-}
+# Dictionnaire ID → Nom
+users = {"1": "Djamel"}
 
-@app.route('/iclock/cdata', methods=['POST'])
+@app.route('/iclock/cdata', methods=['GET', 'POST'])
 def receive_data():
-    data = request.data.decode(errors="ignore").strip()
+    # Récupère la data selon la méthode
+    if request.method == "POST":
+        data = request.data.decode(errors="ignore").strip()
+    else:  # GET
+        data = request.query_string.decode(errors="ignore").strip()
+    
     if not data:
         return "OK"
 
-    # Exemple reçu du K50 : '1\t2026-02-07 06:54:27\t0\t1\t0\t0\t0\t0\t0\t0\t\n'
+    # Essayer d’extraire l’ID et l’heure depuis les données GET/POST
     fields = data.split('\t')
-    user_id = fields[0]
-    timestamp = fields[1]
+    if len(fields) >= 2:
+        user_id = fields[0]
+        timestamp = fields[1]
+        name = users.get(user_id, f"Utilisateur {user_id}")
+        print(f"Bienvenue {name} ! Heure : {timestamp}")
+    else:
+        print(f"Requête reçue mais impossible de parser les données: {data}")
 
-    # Cherche le nom dans le dictionnaire, sinon "Inconnu"
-    name = users.get(user_id, f"Utilisateur {user_id}")
-    print(f"Bienvenue {name} ! Heure : {timestamp}")
     return "OK"
 
 @app.route('/iclock/getrequest', methods=['GET'])
 def get_request():
     sn = request.args.get("SN")
     print(f"📤 COMMAND REQUEST from {sn}")
-
-    # On n'a déjà Djamel dans le dictionnaire → rien à renvoyer
-    return ""
+    return ""  # rien à renvoyer
 
 @app.route('/')
 def home():
