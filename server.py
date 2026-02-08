@@ -2,12 +2,8 @@ from flask import Flask, request
 
 app = Flask(__name__)
 
-# Dictionnaire ID → Nom (ajoute d'autres utilisateurs si nécessaire)
-users = {
-    "1": "Djamel",
-    # "2": "Sami",
-    # "3": "Leila",
-}
+# Dictionnaire ID → Nom, sera rempli automatiquement depuis le K50
+users = {}
 
 @app.route('/iclock/cdata', methods=['POST'])
 def receive_data():
@@ -15,30 +11,46 @@ def receive_data():
     if not data:
         return "OK"
 
-    # Filtrer uniquement les vrais pointages
+    # Identifier le type de table envoyé
     table = request.args.get("table")
-    if table != "ATTLOG":
-        return "OK"  # ignorer OPERLOG et autres tables
 
-    # Exemple de data reçue : '1\t2026-02-07 07:35:52\t0\t1\t0\t0\t0\t0\t0\t0\t'
-    fields = data.split('\t')
-    if len(fields) >= 2:
-        user_id = fields[0]
-        timestamp = fields[1]
-        name = users.get(user_id, f"Utilisateur {user_id}")
-        print(f"Bienvenue {name} ! Heure : {timestamp}")
+    if table == "USERINFO":
+        # K50 envoie les infos utilisateurs
+        # Exemple de ligne : '1\tDjamel\t1\t1\t0\t0\t0\t0\t0\t0\t'
+        lines = data.split('\n')
+        for line in lines:
+            fields = line.strip().split('\t')
+            if len(fields) >= 2:
+                user_id = fields[0]
+                name = fields[1]
+                users[user_id] = name
+                print(f"📥 Utilisateur ajouté / mis à jour : {user_id} → {name}")
+        return "OK"
+
+    elif table == "ATTLOG":
+        # Filtrer uniquement les vrais pointages
+        # Exemple : '1\t2026-02-07 07:35:52\t0\t1\t0\t0\t0\t0\t0\t0\t'
+        fields = data.split('\t')
+        if len(fields) >= 2:
+            user_id = fields[0]
+            timestamp = fields[1]
+            name = users.get(user_id, f"Utilisateur {user_id}")
+            print(f"✅ Bienvenue {name} ! Heure : {timestamp}")
+        else:
+            print(f"Impossible de parser les données ATTLOG: {data}")
+        return "OK"
+
     else:
-        print(f"Impossible de parser les données: {data}")
-
-    return "OK"
+        # Ignorer les autres tables comme OPERLOG
+        return "OK"
 
 @app.route('/iclock/getrequest', methods=['GET'])
 def get_request():
     sn = request.args.get("SN")
     print(f"📤 COMMAND REQUEST from {sn}")
 
-    # Demander au K50 d’envoyer les templates si besoin
-    command = "DATA QUERY FINGERTMP\n"
+    # Demander au K50 d’envoyer tous les utilisateurs
+    command = "DATA QUERY USERINFO\n"
     return command
 
 @app.route('/')
