@@ -8,7 +8,7 @@ app = Flask(__name__)
 users = {}
 
 # Configuration du K50 pour pyzk
-IP_K50 = "192.168.100.200"  # change avec l'IP de ton K50
+IP_K50 = "192.168.137.2"  # change avec l'IP de ton K50
 PORT_K50 = 4370
 TIMEOUT = 5
 
