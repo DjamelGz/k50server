@@ -4,14 +4,18 @@ import requests
 app = Flask(__name__)
 
 # URL brute du JSON sur GitHub
-GITHUB_RAW_URL = "https://raw.githubusercontent.com/TON_UTILISATEUR/k50-server/main/users.json"
+GITHUB_RAW_URL = "https://raw.githubusercontent.com/DjamelGz/k50server/main/users.json"
 
 def get_users():
+    """
+    Récupère le dictionnaire ID → Nom depuis GitHub.
+    """
     try:
         r = requests.get(GITHUB_RAW_URL)
         r.raise_for_status()
         return r.json()
-    except:
+    except Exception as e:
+        print("❌ Erreur en récupérant users.json :", e)
         return {}
 
 @app.route('/iclock/cdata', methods=['POST'])
@@ -23,6 +27,7 @@ def receive_data():
     table = request.args.get("table")
 
     if table == "ATTLOG":
+        # Exemple : '1\t2026-02-07 07:35:52\t0\t1\t0\t0\t0\t0\t0\t0\t'
         fields = data.split('\t')
         if len(fields) >= 2:
             user_id = fields[0]
@@ -41,6 +46,7 @@ def get_request():
     info = request.args.get("INFO")
     print(f"📤 COMMAND REQUEST from {sn}, INFO: {info}")
 
+    # Demander au K50 d’envoyer tous les utilisateurs si besoin
     command = "DATA QUERY USERINFO\n"
     return command
 
