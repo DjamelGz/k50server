@@ -1,9 +1,35 @@
 from flask import Flask, request
+from pyzk.zk import ZK
+from datetime import datetime
 
 app = Flask(__name__)
 
-# Dictionnaire ID → Nom, sera rempli automatiquement depuis le K50
+# Dictionnaire ID → Nom, sera rempli automatiquement depuis le K50 via pyzk
 users = {}
+
+# Configuration du K50 pour pyzk
+IP_K50 = "192.168.100.200"  # change avec l'IP de ton K50
+PORT_K50 = 4370
+TIMEOUT = 5
+
+def update_users_from_k50():
+    """Récupère tous les utilisateurs depuis le K50 et met à jour le dictionnaire users"""
+    global users
+    try:
+        zk = ZK(IP_K50, port=PORT_K50, timeout=TIMEOUT)
+        conn = zk.connect()
+        conn.disable_device()
+        fetched_users = conn.get_users()
+        for u in fetched_users:
+            users[u.user_id] = u.name
+        conn.enable_device()
+        conn.disconnect()
+        print(f"📥 {len(fetched_users)} utilisateurs récupérés depuis le K50")
+    except Exception as e:
+        print("❌ Impossible de récupérer les utilisateurs :", e)
+
+# Mettre à jour les utilisateurs au démarrage du serveur
+update_users_from_k50()
 
 @app.route('/iclock/cdata', methods=['POST'])
 def receive_data():
@@ -11,25 +37,9 @@ def receive_data():
     if not data:
         return "OK"
 
-    # Identifier le type de table envoyé
     table = request.args.get("table")
 
-    if table == "USERINFO":
-        # K50 envoie les infos utilisateurs
-        # Exemple de ligne : '1\tDjamel\t1\t1\t0\t0\t0\t0\t0\t0\t'
-        lines = data.split('\n')
-        for line in lines:
-            fields = line.strip().split('\t')
-            if len(fields) >= 2:
-                user_id = fields[0]
-                name = fields[1]
-                users[user_id] = name
-                print(f"📥 Utilisateur ajouté / mis à jour : {user_id} → {name}")
-        return "OK"
-
-    elif table == "ATTLOG":
-        # Filtrer uniquement les vrais pointages
-        # Exemple : '1\t2026-02-07 07:35:52\t0\t1\t0\t0\t0\t0\t0\t0\t'
+    if table == "ATTLOG":
         fields = data.split('\t')
         if len(fields) >= 2:
             user_id = fields[0]
@@ -37,21 +47,16 @@ def receive_data():
             name = users.get(user_id, f"Utilisateur {user_id}")
             print(f"✅ Bienvenue {name} ! Heure : {timestamp}")
         else:
-            print(f"Impossible de parser les données ATTLOG: {data}")
+            print(f"⚠️ Impossible de parser les données ATTLOG: {data}")
         return "OK"
-
     else:
-        # Ignorer les autres tables comme OPERLOG
-        return "OK"
+        return "OK"  # Ignorer les autres tables
 
-@app.route('/iclock/getrequest', methods=['GET'])
-def get_request():
-    sn = request.args.get("SN")
-    print(f"📤 COMMAND REQUEST from {sn}")
-
-    # Demander au K50 d’envoyer tous les utilisateurs
-    command = "DATA QUERY USERINFO\n"
-    return command
+@app.route('/update_users', methods=['GET'])
+def update_users_endpoint():
+    """Endpoint pour mettre à jour manuellement les utilisateurs depuis le K50"""
+    update_users_from_k50()
+    return f"✅ Dictionnaire mis à jour, {len(users)} utilisateurs disponibles"
 
 @app.route('/')
 def home():
